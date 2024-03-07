@@ -36,27 +36,28 @@ export const useAction = (host= false) => {
   }, [socket]);
 
   const submitPrompt = useCallback(
-    (playerId: string, prompt: string) => {
+    (playerIdx: string, prompt: string) => {
+      console.log("submitPrompt", playerIdx, prompt)
       if (socket) {
-        socket.emit("submitPrompt", playerId, prompt);
+        socket.emit("submitPrompt", playerIdx, prompt);
       }
     },
     [socket],
   );
 
-  const submitDrawing = useCallback(
-    (playerId: string, drawing: string) => {
+  const submitRoundInfo = useCallback(
+    (playerIdx: string, info: string) => {
       if (socket) {
-        socket.emit("submitDraw", playerId, drawing);
+        socket.emit("submitRoundInfo", playerIdx, info);
       }
     },
     [socket],
   );
 
   const likeDraw = useCallback(
-    (playerId: string, socketId: string) => {
+    (playerIdx: string, likeIdx: string) => {
       if (socket) {
-        socket.emit("likeDrawing", playerId, socketId);
+        socket.emit("likeDrawing", playerIdx, likeIdx);
       }
     },
     [socket],
@@ -74,7 +75,7 @@ export const useAction = (host= false) => {
     startGame,
     endGame,
     submitPrompt,
-    submitDrawing,
+    submitRoundInfo,
     likeDraw,
     backRoom,
   };

@@ -14,6 +14,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useMemo, useState } from "react";
 import { useGameState } from "@/contexts/GameStateProvider";
 import { useAction } from "@/lib/useAction";
+import { useRouter } from "next/navigation";
 
 function WaitDialog({ open }: { open: boolean }) {
   return (
@@ -33,20 +34,12 @@ function WaitDialog({ open }: { open: boolean }) {
 }
 
 export default function WaitRoom() {
+  const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const wallet = useWallet();
   const { socket, socketId } = useSocketAuth();
   const { players, isHost, leaderBoard, gameState } = useGameState();
   const { startGame } = useAction(isHost);
-
-  useEffect(() => {
-    if (!isHost && gameState === "waitingForPrompt") {
-      setDialogOpen(true);
-    } 
-    return () => {
-      setDialogOpen(false);
-    }
-  }, [gameState, isHost]);
 
   const buttonEnabled = useMemo(() => isHost && players.length >=2, [isHost, players]);
 

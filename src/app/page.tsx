@@ -34,24 +34,12 @@ export default function Home() {
       if (gameState === "waitingForPlayers") {
         return <WaitRoom />
       }
-      if (gameState === "waitingForPrompt" || gameState === "waitingForDraw") {
-        return <PromptRoom/>
-      }
-      if (gameState === "ended") {
-        return <EndRoom />
-      }
     } else {
-      if (gameState === "waitingForPlayers" || gameState === "waitingForPrompt") {
+      if (gameState === "waitingForPlayers") { 
         return <WaitRoom />
       }     
-      if (gameState === "waitingForDraw") {
-        return <DrawRoom/>
-      }
-      if (gameState === "ended") {
-        return <EndRoom />
-      }
-    }
-  }, [gameState, isHost])
+  }
+}, [gameState, isHost])
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">

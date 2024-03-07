@@ -10,12 +10,13 @@ import React, {
 import { useSocketAuth } from "./SocketAuthContext";
 import { type User } from "@/components/waitRoom";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 interface GameState {
   players: Array<User>;
   isHost: boolean;
-  prompt: string;
-  uploadedImgs: Array<[string, string]>;
+  playerIdx: number;
+  round: number;
   gameState:
     | "none"
     // | "init"
@@ -29,8 +30,8 @@ interface GameState {
 const defaultGameState: GameState = {
   players: [],
   isHost: false,
-  prompt: "",
-  uploadedImgs: [],
+  playerIdx: -1,
+  round: 0,
   gameState: "none",
   leaderBoard: [],
 };
@@ -44,13 +45,13 @@ export const GameStateProvider: FC<{ children: ReactNode }> = ({
 }) => {
   const [gameState, setGameState] = useState<GameState>(defaultGameState);
   const { socket } = useSocketAuth();
+  const router = useRouter();
 
   useEffect(() => {
     if (socket) {
-      socket.on("gameState", (newGameState: GameState) => {
-        setGameState(newGameState);
-      });
-
+      // socket.on("gameState", (newGameState: GameState) => {
+      //   setGameState(newGameState);
+      // });
       socket.on('disconnect', () => {
         setGameState(defaultGameState)
       })
@@ -68,6 +69,7 @@ export const GameStateProvider: FC<{ children: ReactNode }> = ({
           ...prev,
           players,
           isHost: prev.isHost || players.length === 1,
+          playerIdx: prev.playerIdx > -1 ? prev.playerIdx : players.length -1,
           gameState: "waitingForPlayers",
         }));
       });
@@ -79,47 +81,47 @@ export const GameStateProvider: FC<{ children: ReactNode }> = ({
         }));
       });
 
-      socket.on("promptStart", (_) => {
-        console.log("promptStart")
+      socket.on('promptStart', () => {
+        setGameState((prev) => ({ ...prev, gameState: "waitingForPrompt" }));
+        router.replace("/prompt")
+      })
+
+      socket.on('promptFinished', () => {
+        setGameState((prev) => ({ ...prev, gameState: "waitingForDraw" }));
+        router.replace("/round")
+      })
+
+      socket.on('goBackLobby', () => {
         setGameState((prev) => ({
           ...prev,
-          gameState: "waitingForPrompt",
+          round: 0,
+          gameState: "waitingForPlayers",
         }));
-      });
-      socket.on("promptFinished", (prompt: string) => {
-        setGameState((prev) => ({
-          ...prev,
-          prompt,
-          gameState: "waitingForDraw",
-        }));
-      });
+        router.replace("/")
+      })
+      // socket.on("endGame", () => {
+      //   setGameState((prev) => ({ ...prev, gameState: "ended" }));
+      // });
 
-      socket.on("draw", (draw: [string, string]) => {
-        setGameState((prev) => ({
-          ...prev,
-          uploadedImgs: [...prev.uploadedImgs, draw],
-        }));
-      });
-
-      socket.on("endGame", () => {
-        setGameState((prev) => ({ ...prev, gameState: "ended" }));
-      });
-
-      socket.on("bestImage", (playerId: string, exploreUrl) => {
-        toast.success(
-          " The best image come from: " +
-            playerId +
-            " and the url is: " +
-            exploreUrl,
-        );
-      });
+      // socket.on("bestImage", (playerId: string, exploreUrl) => {
+      //   toast.success(
+      //     " The best image come from: " +
+      //       playerId +
+      //       " and the url is: " +
+      //       exploreUrl,
+      //   );
+      // });
 
       return () => {
         socket.off("gameState");
         socket.off("updatePlayers");
-        socket.off("prompt");
-        socket.off("draw");
-        socket.off("endGame");
+        socket.off("updateLeaderBoard");
+        socket.off("promptStart");
+        socket.off("promptFinished");
+        socket.off("goBackLobby");
+        // socket.off("prompt");
+        // socket.off("draw");
+        // socket.off("endGame");
       };
     }
   }, [socket]);
