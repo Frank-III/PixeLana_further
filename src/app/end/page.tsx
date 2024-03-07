@@ -191,7 +191,8 @@ export default function EndRoom() {
               <TooltipTrigger
                 className={cn(
                   "bg-primary text-shadow-md absolute bottom-2 right-2 hidden rounded-xl px-1 italic ring-[5px] ring-orange-600 hover:bg-[#f7d726]",
-                  (isHost && roundRec === players.length) && "flex",
+                  // (isHost && roundRec === players.length) && "flex",
+                  (isHost) && "flex",
                 )}
                 onClick={backRoom}
               >

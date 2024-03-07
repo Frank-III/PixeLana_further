@@ -28,19 +28,6 @@ function FinishDialog({open}: {open: boolean}) {
   )
 }
 
- async function query(prompt: string) {
-    // console.log(process.env.NEXT_SDXL_API_KEY)
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
-      {
-        headers: { Authorization: process.env.SDXL_API_KEY || "" },
-        method: "POST",
-        body: JSON.stringify({ inputs: prompt }),
-      }
-    );
-    const result = await response.blob();
-    return result;
-}
 
 const buttonStyle="rounded-xl italic ring-[5px] ring-orange-600 hover:bg-[#f7d726] text-shadow-md"
 const inputStyle ="flex-1 border ring-orange-600 ring-[5px] rounded-lg focus-visible:ring-emerald-600 focus-visible:ring-[5px]"
@@ -67,8 +54,30 @@ export default function Game() {
   // duration of the round
   const [timeLeft, setTimeLeft] = useState(60); 
 
+
+ async function query(prompt: string) {
+    // console.log(process.env.NEXT_SDXL_API_KEY)
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+      {
+        headers: { Authorization: process.env.SDXL_API_KEY || "" },
+        method: "POST",
+        body: JSON.stringify({ inputs: prompt }),
+      }
+    );
+    const blob = await response.blob();
+    // return blob;
+    const buffer = await blob.arrayBuffer();
+    const base64String = Buffer.from(buffer).toString('base64');
+    
+    // Return the Base64 string
+    return `data:image/jpeg;base64,${base64String}`;
+}
+
   const submitInfo= (info: string) => {
     submitRoundInfo(playerIdx.toString(), info);
+    setAIPrompt("");
+    setAiImage(undefined);
     setSubmitted(true);
   }
 
@@ -118,8 +127,8 @@ export default function Game() {
   const generate = async (e) => {
     e.preventDefault(); 
     setGenerating(true);
-    const blob = await query(aiPrompt);
-    const url = URL.createObjectURL(blob);
+    const url = await query(aiPrompt);
+    // const url = URL.createObjectURL(blob);
     setGenerating(false);
     setAiImage(url);
   }
