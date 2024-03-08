@@ -39,3 +39,5 @@ next-env.d.ts
 
 anchor/target
 anchor/node_modules
+
+backend_rs/target
