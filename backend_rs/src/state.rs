@@ -1,13 +1,13 @@
-use std::ops::Sub;
 use std::sync::Mutex;
-use std::sync::Arc;
+// use std::sync::Arc;
+use std::sync::RwLock;
 use anyhow::{bail, Result};
 use serde::Deserialize;
 use std::{collections::HashMap, hash::Hash};
 
 use crate::utils::rotate_map;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, )]
 pub struct Player {
     pub id: String,
     pub pub_key: String,
@@ -15,11 +15,6 @@ pub struct Player {
     pub is_host: bool,
     pub avatar: String,
 }
-
-pub enum ClientEvent {
-
-}
-
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Submission {
@@ -34,8 +29,21 @@ pub struct Content {
   content: String
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct AllImgOrPrompt {
+  content: Vec<Content>,
+  round: u8
+}
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, serde::Deserialize)]
+pub struct LikeDrawInput {
+  pub player_id: u8,
+  pub like_id: u8
+
+}
+
+
+#[derive(thiserror::Error, Debug, serde::Serialize)]
 pub enum GameError {
     #[error("Game is full")]
     GameFull,
@@ -53,15 +61,22 @@ pub enum GameError {
     InvalidRound
 }
 
+
 #[derive(Debug)]
 pub struct GameState {
     pub players: Vec<Player>,
     pub round: u8,
     pub game_started: bool,
-    pub round_imgs_or_prompts: Mutex<Vec<HashMap<u8, String>>>,
-    pub prev_round_imgs_or_prompts: Option<Mutex<HashMap<u8, String>>>,
-    pub leader_board: Mutex<HashMap<u8, i32>>
+    pub round_imgs_or_prompts: Vec<HashMap<u8, String>>,
+    pub prev_round_imgs_or_prompts: Option<HashMap<u8, String>>,
+    pub leader_board: HashMap<String, i32>
 }
+
+impl Default for GameState {
+    fn default() -> Self {
+        GameState::new()
+    }
+} 
 
 impl GameState {
     pub fn new() -> GameState {
@@ -69,29 +84,36 @@ impl GameState {
             players: Vec::new(),
             round: 0,
             game_started: false,
-            round_imgs_or_prompts: Mutex::new(Vec::new()),
+            round_imgs_or_prompts: Vec::new(),
             prev_round_imgs_or_prompts: None,
-            leader_board: Mutex::new(HashMap::new())
+            leader_board: HashMap::new()
         }
+    }
+
+    pub fn get_leaderboard(&self) -> Vec<(String, i32)> {
+      let mut leaderboard = self.leader_board.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<(String, i32)>>();
+      leaderboard.sort_by(|a,b| b.1.cmp(&a.1));
+      leaderboard
     }
 
     pub fn reset_game(&mut self) -> Result<()> {
         self.round = 0;
         self.game_started = false;
-        self.round_imgs_or_prompts = Mutex::new(Vec::new());  
+        self.round_imgs_or_prompts = Vec::new();  
         self.prev_round_imgs_or_prompts = None;
         Ok(())
     }
 
-    pub fn add_player(&mut self, player: Player) -> Result<u8> {
-        if self.players.len() >= 8 {
-            bail!(GameError::GameFull)
-        };
+    pub fn add_player(&mut self, player: Player) -> Result<Vec<Player>> {
         if self.game_started {
             bail!(GameError::GameStarted)
         }
+        if self.players.len() >= 8 {
+            bail!(GameError::GameFull)
+        };
         self.players.push(player);
-        return Ok(self.players.len() as u8);
+        return Ok(self.players.clone())
+        // return Ok(players.len() as u8);
     }
 
     // TODO: add if is host check
@@ -107,23 +129,23 @@ impl GameState {
     }
 
     pub fn submit_img_or_prompt(&mut self, submission: Submission) -> Result<bool> {
-        let mut round_imgs_or_prompts = self.round_imgs_or_prompts.lock().unwrap();
-        if round_imgs_or_prompts.len() as u8 == self.round {
-            round_imgs_or_prompts.push(HashMap::new());
+        if self.round_imgs_or_prompts.len() as u8 == self.round {
+            self.round_imgs_or_prompts.push(HashMap::new());
         }
-        let round_imgs_or_prompts = round_imgs_or_prompts.get_mut(self.round as usize).unwrap();
+        let round_imgs_or_prompts = self.round_imgs_or_prompts.get_mut(self.round as usize).unwrap();
         round_imgs_or_prompts.insert(submission.player_id, submission.content);
 
-        if round_imgs_or_prompts.len() as u8 == self.players.len() as u8 {
-          self.prev_round_imgs_or_prompts = Some(Mutex::new(rotate_map(round_imgs_or_prompts)));
-          return Ok(true); 
-        }
+          if round_imgs_or_prompts.len() as u8 == self.players.len() as u8 {
+            self.round += 1;
+            self.prev_round_imgs_or_prompts = Some(rotate_map(round_imgs_or_prompts));
+            return Ok(true); 
+          }
 
         Ok(false)
     }
 
     pub fn send_round_info(&self, player_id:u8) -> Result<Content> {
-      let prev_state = self.prev_round_imgs_or_prompts.as_ref().ok_or(GameError::GameNotStarted)?.lock().unwrap();
+      let prev_state = self.prev_round_imgs_or_prompts.as_ref().ok_or(GameError::GameNotStarted)?;
       let round_info = prev_state.get(&player_id).ok_or(GameError::PlayerDoesNotExist)?;
 
       Ok({Content {
@@ -132,24 +154,30 @@ impl GameState {
       }})
     }
 
-    pub fn get_all_imgs_or_prompts(&mut self, round: u8) -> Result<Vec<Content>> {
-      let round_imgs_or_prompts = self.round_imgs_or_prompts.lock().unwrap();
-      let round_img_or_prompt = (*round_imgs_or_prompts).iter().enumerate().map(|(idx, round_map)| {
+    pub fn get_all_imgs_or_prompts(&self, round: u8) -> Result<AllImgOrPrompt> {
+      let round_img_or_prompt = (self.round_imgs_or_prompts).iter().enumerate().map(|(idx, round_map)| {
         Content {
           r#type: if idx % 2 == 0 { "story".to_string() } else { "image".to_string() },
           content: round_map.get(&round).unwrap().clone()
         }
       }).collect::<Vec<Content>>();
-      Ok(round_img_or_prompt)
+      Ok(AllImgOrPrompt {
+        content: round_img_or_prompt,
+        round: self.round + 1
+    })
     }
 
-    pub fn like_img(&mut self, player_id: u8, like_id: u8) ->Result<String> {
-      let round_imgs_or_prompts = self.round_imgs_or_prompts.lock().unwrap();
-      let img_vec_idx = if player_id > like_id { (player_id - like_id) % self.players.len() as u8 } else { (like_id - player_id) % self.players.len() as u8};
-      let best_img = round_imgs_or_prompts.get(img_vec_idx as usize).unwrap().get(&like_id).unwrap();
-      let mut leader_board = self.leader_board.lock().unwrap();
-      let player_score = leader_board.get_mut(&like_id).unwrap();
+    pub fn like_img(&mut self, input: LikeDrawInput) ->Result<(String, bool)> {
+      let player_len = self.players.len() as u8;
+      let img_vec_idx = if input.player_id > input.like_id { (input.player_id - input.like_id) % player_len as u8 } else { (input.like_id - input.player_id) % player_len as u8};
+      let best_img = self.round_imgs_or_prompts.get(img_vec_idx as usize).unwrap().get(&input.like_id).unwrap();
+      let like_player = self.players.get(input.like_id as usize).ok_or(GameError::PlayerDoesNotExist)?;
+      let player_score = self.leader_board.get_mut(&like_player.pub_key).unwrap();
       *player_score += 1;
-      Ok(best_img.clone())
+      Ok((best_img.clone(), input.player_id == self.players.len() as u8 - 1))
+    }
+
+    pub fn game_finished(&self) -> bool {
+      self.round == self.players.len() as u8
     }
 }
