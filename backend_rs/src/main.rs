@@ -14,15 +14,9 @@ use tracing_subscriber::FmtSubscriber;
 use std::sync::Mutex;
 use std::sync::Arc;
 use tracing::info;
-use state::{GameState, Player, Content, Submission, LikeDrawInput};
+use state::{GameState, Player, Content, Submission, LikeDrawInput, PlayerInput};
 struct Game(pub Mutex<GameState>);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Todo {
-    completed: bool,
-    editing: bool,
-    title: String,
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,17 +31,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(Game(Mutex::new(GameState::default())))
         .build_layer();
 
-    io.ns("/", |s: SocketRef, game: State<GameState>| {
+    io.ns("/", |s: SocketRef | {
         info!("New connection: {}", s.id);
-
-        s.on("addPlayer", |s: SocketRef, Data::<Player>(player), State(Game(game)), io: State<SocketIo>| {
+        s.on("addPlayer", |socket: SocketRef, Data::<PlayerInput>(player), State(Game(game))| {
             info!("Received addPlayer event: {:?}", player);
             let mut game = game.lock().unwrap();    
-            if let Ok(players) = game.add_player(player) {
-                io.emit("updatePlayers", players).ok();
-                io.emit("updateLeaderBoard", game.get_leaderboard()).ok();
+            if let Ok(players) = game.add_player(player, socket.id.as_str().to_string()) {
+                socket.emit("updatePlayers", players.clone()).ok();
+                socket.broadcast().emit("updatePlayers", players).ok();
+                socket.emit("updateLeaderBoard", game.get_leaderboard()).ok();
+                // io_clone.emit("updatePlayers", players).ok(); // Emit to all clients
+                // io_clone.emit("updateLeaderBoard", game.get_leaderboard()).ok(); // Emit to all clients
             }
-
         });
 
         s.on("startGame", |s: SocketRef, State(Game(game)), io: State<SocketIo>| {
@@ -117,6 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 io.emit("backRoom", ()).ok();
             }
         });
+
     });
 
     let app = axum::Router::new()

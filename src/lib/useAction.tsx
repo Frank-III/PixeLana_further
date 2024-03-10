@@ -39,7 +39,7 @@ export const useAction = (host= false) => {
     (playerIdx: string, prompt: string) => {
       console.log("submitPrompt", playerIdx, prompt)
       if (socket) {
-        socket.emit("submitPrompt", playerIdx, prompt);
+        socket.emit("submitPrompt", {playerIdx:playerIdx, content:prompt});
       }
     },
     [socket],
@@ -48,7 +48,7 @@ export const useAction = (host= false) => {
   const submitRoundInfo = useCallback(
     (playerIdx: string, info: string) => {
       if (socket) {
-        socket.emit("submitRoundInfo", playerIdx, info);
+        socket.emit("submitRoundInfo", {playerIdx: playerIdx, content: info});
       }
     },
     [socket],
@@ -57,7 +57,7 @@ export const useAction = (host= false) => {
   const likeDraw = useCallback(
     (playerIdx: string, likeIdx: string) => {
       if (socket) {
-        socket.emit("likeDrawing", playerIdx, likeIdx);
+        socket.emit("likeDrawing", {playerIdx:playerIdx, likeIdx:likeIdx});
       }
     },
     [socket],

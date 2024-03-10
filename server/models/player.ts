@@ -5,5 +5,5 @@ export type Player = {
     name: string;
     avatar: string;
     isHost: boolean;
-    publicKey: string;
+    pubKey: string;
   };

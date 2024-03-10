@@ -41,7 +41,7 @@ export const SocketAuthProvider: FC<{ children: ReactNode }> = ({ children }) =>
     newSocket.on('connect', () => {
       console.log('Connected to Socket.IO server', newSocket.id);
       setSocketId(newSocket.id!);
-      newSocket.emit('addPlayer', name, avatar, pubKey);
+      newSocket.emit('addPlayer', {name:name, avatar:avatar, pubKey:pubKey});
     });
 
     newSocket.on('connect_error', (error) => {

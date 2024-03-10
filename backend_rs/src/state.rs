@@ -10,15 +10,29 @@ use crate::utils::rotate_map;
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, )]
 pub struct Player {
     pub id: String,
+    #[serde(rename = "pubKey")]
     pub pub_key: String,
     pub name: String,
+    #[serde(rename = "isHost")]
     pub is_host: bool,
     pub avatar: String,
 }
 
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerInput {
+    #[serde(rename = "pubKey")]
+    pub pub_key: String,
+    pub name: String,
+    pub avatar: String,
+}
+
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Submission {
-  pub player_id: u8,
+    #[serde(rename = "playerIdx")]
+  pub player_idx: u8,
   pub content: String
 }
 
@@ -26,7 +40,8 @@ pub struct Submission {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Content {
   r#type: String,
-  content: String
+  data: String,
+  idx: u8
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -36,10 +51,10 @@ pub struct AllImgOrPrompt {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LikeDrawInput {
-  pub player_id: u8,
-  pub like_id: u8
-
+  pub player_idx: u8,
+  pub like_idx: u8
 }
 
 
@@ -104,14 +119,20 @@ impl GameState {
         Ok(())
     }
 
-    pub fn add_player(&mut self, player: Player) -> Result<Vec<Player>> {
+    pub fn add_player(&mut self, player: PlayerInput, socket_id: String) -> Result<Vec<Player>> {
         if self.game_started {
             bail!(GameError::GameStarted)
         }
         if self.players.len() >= 8 {
             bail!(GameError::GameFull)
         };
-        self.players.push(player);
+        self.players.push(Player {
+            id: socket_id,
+            pub_key: player.pub_key,
+            name: player.name,
+            is_host: self.players.len() == 0,
+            avatar: player.avatar
+        });
         return Ok(self.players.clone())
         // return Ok(players.len() as u8);
     }
@@ -133,7 +154,7 @@ impl GameState {
             self.round_imgs_or_prompts.push(HashMap::new());
         }
         let round_imgs_or_prompts = self.round_imgs_or_prompts.get_mut(self.round as usize).unwrap();
-        round_imgs_or_prompts.insert(submission.player_id, submission.content);
+        round_imgs_or_prompts.insert(submission.player_idx, submission.content);
 
           if round_imgs_or_prompts.len() as u8 == self.players.len() as u8 {
             self.round += 1;
@@ -150,7 +171,8 @@ impl GameState {
 
       Ok({Content {
         r#type: if self.round % 2 == 0 { "story".to_string() } else { "image".to_string() },
-        content: round_info.clone()
+        data: round_info.clone(),
+        idx: 0
       }})
     }
 
@@ -158,7 +180,8 @@ impl GameState {
       let round_img_or_prompt = (self.round_imgs_or_prompts).iter().enumerate().map(|(idx, round_map)| {
         Content {
           r#type: if idx % 2 == 0 { "story".to_string() } else { "image".to_string() },
-          content: round_map.get(&round).unwrap().clone()
+          data: round_map.get(&round).unwrap().clone(),
+          idx: idx as u8
         }
       }).collect::<Vec<Content>>();
       Ok(AllImgOrPrompt {
@@ -169,12 +192,12 @@ impl GameState {
 
     pub fn like_img(&mut self, input: LikeDrawInput) ->Result<(String, bool)> {
       let player_len = self.players.len() as u8;
-      let img_vec_idx = if input.player_id > input.like_id { (input.player_id - input.like_id) % player_len as u8 } else { (input.like_id - input.player_id) % player_len as u8};
-      let best_img = self.round_imgs_or_prompts.get(img_vec_idx as usize).unwrap().get(&input.like_id).unwrap();
-      let like_player = self.players.get(input.like_id as usize).ok_or(GameError::PlayerDoesNotExist)?;
+      let img_vec_idx = if input.player_idx > input.like_idx { (input.player_idx - input.like_idx) % player_len as u8 } else { (input.like_idx - input.player_idx) % player_len as u8};
+      let best_img = self.round_imgs_or_prompts.get(img_vec_idx as usize).unwrap().get(&input.like_idx).unwrap();
+      let like_player = self.players.get(input.like_idx as usize).ok_or(GameError::PlayerDoesNotExist)?;
       let player_score = self.leader_board.get_mut(&like_player.pub_key).unwrap();
       *player_score += 1;
-      Ok((best_img.clone(), input.player_id == self.players.len() as u8 - 1))
+      Ok((best_img.clone(), input.player_idx == self.players.len() as u8 - 1))
     }
 
     pub fn game_finished(&self) -> bool {

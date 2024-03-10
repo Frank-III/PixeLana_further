@@ -44,8 +44,8 @@ export default function EndRoom() {
     if (socket) {
       socket.emit("getAllImgsOrPrompts", roundRec);
 
-      socket.on('allImgsOrPrompts', (allContent, newRound) => {
-        const contents = allContent.map((c: any) => ({
+      socket.on('allImgsOrPrompts', ({content, round}) => {
+        const contents = content.map((c: any) => ({
           ...c,
           user: players[c.idx],
         } as Content))

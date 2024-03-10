@@ -1,3 +1,4 @@
+import { avatars } from './../src/lib/avatars';
 import { like } from './../src/lib/iconSvgs';
 import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
@@ -51,19 +52,21 @@ io.use((socket, next) => {
 // Player connects
 io.on('connect', (socket) => {
     // Add player to memory when they connect to lobby
-    socket.on('addPlayer', (name, avatar, publicKey) => {
-        if (players[publicKey]) {
-            socket.emit('addPlayerError', `Public key ${publicKey} is already in use.`);
+    socket.on('addPlayer', (newPlayer) => {
+        const { name, avatar, pubKey } = newPlayer;
+        console.log(`User ${socket.id} is trying to join with public key ${pubKey}`)
+        if (players[pubKey]) {
+            socket.emit('addPlayerError', `Public key ${pubKey} is already in use.`);
             return;
         }
         const isHost = Object.keys(players).length == 0; 
-        let player = { socketId: socket.id, name, avatar, isHost, publicKey };
-        playerIdxToPublicKey[totalPlayers] = publicKey;
-        pubKeyToPlayerIdx[publicKey] = totalPlayers;
+        let player = { socketId: socket.id, name, avatar, isHost, pubKey };
+        playerIdxToPublicKey[totalPlayers] = pubKey;
+        pubKeyToPlayerIdx[pubKey] = totalPlayers;
         totalPlayers++;
-        players[publicKey] = player;
-        socketIdToPublicKey[socket.id] = publicKey;
-        leaderBoard[publicKey] = 0;
+        players[pubKey] = player;
+        socketIdToPublicKey[socket.id] = pubKey;
+        leaderBoard[pubKey] = 0;
         
         
         console.log(`User ${socket.id} connected. Total players: ${Object.keys(players).length}`);
@@ -79,9 +82,9 @@ io.on('connect', (socket) => {
             return;
         }
 
-        delete players[player.publicKey];
+        delete players[player.pubKey];
         delete socketIdToPublicKey[socket.id];
-        delete leaderBoard[player.publicKey];
+        delete leaderBoard[player.pubKey];
         totalPlayers--;
         // playerIdxToPublicKey = Object.entries(playerIdxToPublicKey).reduce((acc, [idx, publicKey]) => {
         //     if (player.publicKey === publicKey) {
@@ -93,7 +96,6 @@ io.on('connect', (socket) => {
             gameStarted = false;
         }
         console.log(`User ${socket.id} disconnected. Total players: ${Object.keys(players).length}`);
-        console.log(players);
         io.emit('updatePlayers', Object.values(players));
     });
 
@@ -105,9 +107,9 @@ io.on('connect', (socket) => {
     }); 
     
     
-    socket.on('submitPrompt', (playerIdx, prompt) => {
+    socket.on('submitPrompt', ({playerIdx, content}) => {
         if (!roundImgsOrPrompt.length) roundImgsOrPrompt.push({});
-        roundImgsOrPrompt[0][playerIdx] = prompt;
+        roundImgsOrPrompt[0][playerIdx] = content;
         if (Object.keys(roundImgsOrPrompt[0]).length === totalPlayers) {
             round += 1;
             prevOrdImgsOrPrompt = rotateRecord(roundImgsOrPrompt[0]);
@@ -123,12 +125,12 @@ io.on('connect', (socket) => {
 
     })
 
-    socket.on('submitRoundInfo', (playerIdx, imgOrPrompt) => {
-        console.log(`User ${playerIdx} submitted ${imgOrPrompt}`)
+    socket.on('submitRoundInfo', ({playerIdx, content}) => {
+        console.log(`User ${playerIdx} submitted ${content}`)
         if (roundImgsOrPrompt.length === round) {
             roundImgsOrPrompt.push({});
         }
-        roundImgsOrPrompt[round][playerIdx] = imgOrPrompt;
+        roundImgsOrPrompt[round][playerIdx] = content;
         if (Object.keys(roundImgsOrPrompt[round]).length === totalPlayers) {
             console.log(`round ${round} finished`)
             if (round + 1 === totalPlayers) {
@@ -150,11 +152,11 @@ io.on('connect', (socket) => {
 
         console.log(roundImgOrPromp)
 
-        socket.emit('allImgsOrPrompts', roundImgOrPromp, roundRec+1);
+        socket.emit('allImgsOrPrompts', {content:roundImgOrPromp, round:roundRec+1});
         // endroundRec += 1;
     })
 
-    socket.on('likeDrawing', async (playerIdx, likeIdx) => {
+    socket.on('likeDrawing', async ({playerIdx, likeIdx}) => {
         console.log(playerIdx, likeIdx)
         const publicKey = playerIdxToPublicKey[likeIdx];
         const best = roundImgsOrPrompt[Math.abs((likeIdx - playerIdx)) % totalPlayers][likeIdx];
