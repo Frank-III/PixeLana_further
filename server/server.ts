@@ -1,6 +1,4 @@
-import { avatars } from './../src/lib/avatars';
-import { like } from './../src/lib/iconSvgs';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { Player } from './models/player';
 import mint from './mint';
