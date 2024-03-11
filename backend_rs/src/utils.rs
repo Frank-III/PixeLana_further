@@ -1,8 +1,5 @@
 use std::collections::HashMap;
 
-
-
-
 pub fn rotate_map(map: &HashMap<u8, String>, ) -> HashMap<u8, String> {
     let mut new_map = HashMap::new();
     let mut ordered_keys = map.keys().collect::<Vec<&u8>>();
@@ -15,5 +12,3 @@ pub fn rotate_map(map: &HashMap<u8, String>, ) -> HashMap<u8, String> {
 
     new_map
 }
-
-

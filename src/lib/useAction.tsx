@@ -36,28 +36,28 @@ export const useAction = (host= false) => {
   }, [socket]);
 
   const submitPrompt = useCallback(
-    (playerIdx: string, prompt: string) => {
+    (playerIdx: number, prompt: string) => {
       console.log("submitPrompt", playerIdx, prompt)
       if (socket) {
-        socket.emit("submitPrompt", playerIdx, prompt);
+        socket.emit("submitPrompt", {playerIdx:playerIdx, content:prompt});
       }
     },
     [socket],
   );
 
   const submitRoundInfo = useCallback(
-    (playerIdx: string, info: string) => {
+    (playerIdx: number, info: string) => {
       if (socket) {
-        socket.emit("submitRoundInfo", playerIdx, info);
+        socket.emit("submitRoundInfo", {playerIdx: playerIdx, content: info});
       }
     },
     [socket],
   );
 
   const likeDraw = useCallback(
-    (playerIdx: string, likeIdx: string) => {
+    (playerIdx: number, likeIdx: number) => {
       if (socket) {
-        socket.emit("likeDrawing", playerIdx, likeIdx);
+        socket.emit("likeDrawing", {playerIdx:playerIdx, likeIdx:likeIdx});
       }
     },
     [socket],

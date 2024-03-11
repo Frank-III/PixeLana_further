@@ -1,4 +1,4 @@
-# PixeLana
+# PixeLana Further
 PixeLana is a multiplayer web app game where Stable Diffusion meets the Solana Blockchain. Players will take turns entering a prompt for the rest of the party to utilize the power of Stable Diffusion and generate images based on the prompt. The author of each prompt will then judge and select which art piece is the funniest, prettiest, or best image in the context of the prompt.
 
 Winners will have their art minted in memory and as an NFT on the Solana Blockchain with fast confirmation times and low transaction fees.

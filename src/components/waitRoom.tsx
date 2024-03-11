@@ -7,7 +7,7 @@ export interface User {
   name: string;
   avatar: string;
   isHost: boolean;
-  publicKey: string;
+  pubKey: string;
 }
 
 interface RoomProps {
@@ -27,6 +27,7 @@ export function UserCard({ user }: { user: User }) {
 
 
 export function Room({ users }: RoomProps) {
+  console.log(users)
   
   return (
     <div className="flex flex-col items-center justify-center w-full">
