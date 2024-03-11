@@ -46,7 +46,7 @@ export default function PromptRoom() {
   // const router = useRouter();
 
   const submitStory = (prompt: string) => {
-    submitPrompt(playerIdx.toString(), prompt);
+    submitPrompt(playerIdx, prompt);
     setSubmitted(true);
   };
 

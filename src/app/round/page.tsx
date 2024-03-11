@@ -75,7 +75,7 @@ export default function Game() {
 }
 
   const submitInfo= (info: string) => {
-    submitRoundInfo(playerIdx.toString(), info);
+    submitRoundInfo(playerIdx, info);
     setAIPrompt("");
     setAiImage(undefined);
     setSubmitted(true);

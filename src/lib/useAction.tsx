@@ -36,7 +36,7 @@ export const useAction = (host= false) => {
   }, [socket]);
 
   const submitPrompt = useCallback(
-    (playerIdx: string, prompt: string) => {
+    (playerIdx: number, prompt: string) => {
       console.log("submitPrompt", playerIdx, prompt)
       if (socket) {
         socket.emit("submitPrompt", {playerIdx:playerIdx, content:prompt});
@@ -46,7 +46,7 @@ export const useAction = (host= false) => {
   );
 
   const submitRoundInfo = useCallback(
-    (playerIdx: string, info: string) => {
+    (playerIdx: number, info: string) => {
       if (socket) {
         socket.emit("submitRoundInfo", {playerIdx: playerIdx, content: info});
       }
@@ -55,7 +55,7 @@ export const useAction = (host= false) => {
   );
 
   const likeDraw = useCallback(
-    (playerIdx: string, likeIdx: string) => {
+    (playerIdx: number, likeIdx: number) => {
       if (socket) {
         socket.emit("likeDrawing", {playerIdx:playerIdx, likeIdx:likeIdx});
       }

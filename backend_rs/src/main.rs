@@ -37,31 +37,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("Received addPlayer event: {:?}", player);
             let mut game = game.lock().unwrap();    
             if let Ok(players) = game.add_player(player, socket.id.as_str().to_string()) {
-                socket.emit("updatePlayers", players.clone()).ok();
-                socket.broadcast().emit("updatePlayers", players).ok();
-                socket.emit("updateLeaderBoard", game.get_leaderboard()).ok();
+                socket.emit("updatePlayers", vec![&players]).ok();
+                socket.broadcast().emit("updatePlayers", vec![&players]).ok();
+                // socket.emit("updateLeaderBoard", game.get_leaderboard()).ok();
                 // io_clone.emit("updatePlayers", players).ok(); // Emit to all clients
                 // io_clone.emit("updateLeaderBoard", game.get_leaderboard()).ok(); // Emit to all clients
             }
         });
 
-        s.on("startGame", |s: SocketRef, State(Game(game)), io: State<SocketIo>| {
+        s.on("startGame", |socket: SocketRef, State(Game(game))| {
             info!("Received startGame event");
             let mut game = game.lock().unwrap();
             if let Ok(_) = game.start_game() {
-                io.emit("gameStarted", game.get_leaderboard()).ok();
+                socket.emit("promptStart", ()).ok();
+                socket.broadcast().emit("promptStart", ()).ok();
             }
         });
 
-        s.on("submitPrompt", |s: SocketRef, Data::<Submission>(submission), State(Game(game)), io: State<SocketIo>| {
+        s.on("submitPrompt", |socket: SocketRef, Data::<Submission>(submission), State(Game(game))| {
             info!("Received submitPrompt event: {:?}", submission);
             let mut game = game.lock().unwrap();
             if let Ok(true) = game.submit_img_or_prompt(submission) {
-                io.emit("promptFinished", game.get_leaderboard()).ok();
+                socket.emit("promptFinished", ()).ok();
+                socket.broadcast().emit("promptFinished", ()).ok();
             }
         });
 
-        s.on("getRoundInfo", |s: SocketRef, Data::<usize>(player_idx), State(Game(game)), io: State<SocketIo>| {
+        s.on("getRoundInfo", |s: SocketRef, Data::<usize>(player_idx), State(Game(game))| {
             info!("Received getRoundInfo event: {:?}", player_idx);
             let game = game.lock().unwrap();
             if let Ok(content) = game.send_round_info(player_idx as u8) {
@@ -69,19 +71,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
 
-        s.on("submitRoundInfo", |s: SocketRef, Data::<Submission>(submission), State(Game(game)), io: State<SocketIo>| {
+        s.on("submitRoundInfo", |socket: SocketRef, Data::<Submission>(submission), State(Game(game))| {
             info!("Received submitRoundInfo event: {:?}", submission);
             let mut game = game.lock().unwrap();
             if let Ok(true) = game.submit_img_or_prompt(submission) {
                 if game.game_finished() {
-                    io.emit("gameFinished", ()).ok();
+                    socket.emit("gameFinished", ()).ok();
+                    socket.broadcast().emit("gameFinished", ()).ok();
                 } else {
-                io.emit("roundFinished", ()).ok();
+                    socket.emit("roundFinished", ()).ok();
+                    socket.broadcast().emit("roundFinished", ()).ok();
                 }
             }
         });
 
-        s.on("getAllImgsOrPrompts", |s: SocketRef, Data::<usize>(round), State(Game(game)), io: State<SocketIo>| {
+        s.on("getAllImgsOrPrompts", |s: SocketRef, Data::<usize>(round), State(Game(game))| {
             info!("Received getAllImgsOrPrompts event: {:?}", round);
             let game = game.lock().unwrap();
             if let Ok(all_imgs_prompts) = game.get_all_imgs_or_prompts(round as u8) {
@@ -89,15 +93,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
 
-        s.on("likeDrawing", |s: SocketRef, Data::<LikeDrawInput>(input), State(Game(game)), io: State<SocketIo>| {
+        s.on("likeDrawing", |socket: SocketRef, Data::<LikeDrawInput>(input), State(Game(game))| {
             info!("Received likeDrawing event: {:?}", input);
             let mut game = game.lock().unwrap();
+            let round = input.player_idx;
             match game.like_img(input) {
-                Ok((best_img, true)) => {
-                    io.emit("bestImg", best_img).ok();
-                },
-                Ok((best_img, false)) => {
-                    io.emit("bestImg", best_img).ok();
+                Ok((best_img, like_end)) => {
+                    socket.emit("bestImage", &best_img).ok();
+                    socket.broadcast().emit("bestImage", best_img).ok();
+                    if !like_end {
+                        socket.emit("roundImgLiked", round + 1).ok();
+                        socket.broadcast().emit("roundImgLiked", round + 1).ok();
+                        let leader_board = game.get_leaderboard();
+                        socket.emit("updateLeaderBoard", &leader_board).ok();
+                        socket.broadcast().emit("updateLeaderBoard", &leader_board).ok();
+                    }
                 },
                 Err(e) => {
                     info!("Error: {:?}", e);
@@ -105,11 +115,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
 
-        s.on("backRoom", |s: SocketRef, State(Game(game)), io: State<SocketIo>| {
+        s.on("backRoom", |socket: SocketRef, State(Game(game))| {
             info!("Received backRoom event");
             let mut game = game.lock().unwrap();
             if let Ok(_) = game.reset_game() {
-                io.emit("backRoom", ()).ok();
+                socket.emit("backRoom", ()).ok();
+                socket.broadcast().emit("backRoom", ()).ok();
             }
         });
 

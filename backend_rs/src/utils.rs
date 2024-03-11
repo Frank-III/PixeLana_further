@@ -12,5 +12,3 @@ pub fn rotate_map(map: &HashMap<u8, String>, ) -> HashMap<u8, String> {
 
     new_map
 }
-
-

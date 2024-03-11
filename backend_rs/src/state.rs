@@ -128,11 +128,12 @@ impl GameState {
         };
         self.players.push(Player {
             id: socket_id,
-            pub_key: player.pub_key,
+            pub_key: player.pub_key.clone(),
             name: player.name,
             is_host: self.players.len() == 0,
             avatar: player.avatar
         });
+        self.leader_board.insert(player.pub_key, 0);
         return Ok(self.players.clone())
         // return Ok(players.len() as u8);
     }
@@ -142,7 +143,7 @@ impl GameState {
         if self.game_started {
             bail!(GameError::GameStarted)
         }
-        if self.players.len() < 3 {
+        if self.players.len() < 2 {
             bail!(GameError::NotEnoughPlayers)
         }
         self.game_started = true;
@@ -156,11 +157,11 @@ impl GameState {
         let round_imgs_or_prompts = self.round_imgs_or_prompts.get_mut(self.round as usize).unwrap();
         round_imgs_or_prompts.insert(submission.player_idx, submission.content);
 
-          if round_imgs_or_prompts.len() as u8 == self.players.len() as u8 {
-            self.round += 1;
-            self.prev_round_imgs_or_prompts = Some(rotate_map(round_imgs_or_prompts));
-            return Ok(true); 
-          }
+        if round_imgs_or_prompts.len() as u8 == self.players.len() as u8 {
+          self.round += 1;
+          self.prev_round_imgs_or_prompts = Some(rotate_map(round_imgs_or_prompts));
+          return Ok(true); 
+        }
 
         Ok(false)
     }
@@ -170,13 +171,16 @@ impl GameState {
       let round_info = prev_state.get(&player_id).ok_or(GameError::PlayerDoesNotExist)?;
 
       Ok({Content {
-        r#type: if self.round % 2 == 0 { "story".to_string() } else { "image".to_string() },
+        r#type: if self.round % 2 == 0 { "image".to_string() } else { "story".to_string() },
         data: round_info.clone(),
         idx: 0
       }})
     }
 
     pub fn get_all_imgs_or_prompts(&self, round: u8) -> Result<AllImgOrPrompt> {
+      if round > self.round {
+        bail!(GameError::InvalidRound);
+      }
       let round_img_or_prompt = (self.round_imgs_or_prompts).iter().enumerate().map(|(idx, round_map)| {
         Content {
           r#type: if idx % 2 == 0 { "story".to_string() } else { "image".to_string() },
@@ -195,8 +199,7 @@ impl GameState {
       let img_vec_idx = if input.player_idx > input.like_idx { (input.player_idx - input.like_idx) % player_len as u8 } else { (input.like_idx - input.player_idx) % player_len as u8};
       let best_img = self.round_imgs_or_prompts.get(img_vec_idx as usize).unwrap().get(&input.like_idx).unwrap();
       let like_player = self.players.get(input.like_idx as usize).ok_or(GameError::PlayerDoesNotExist)?;
-      let player_score = self.leader_board.get_mut(&like_player.pub_key).unwrap();
-      *player_score += 1;
+      let player_score = self.leader_board.entry(like_player.pub_key.clone()).and_modify(|v| *v += 1).or_insert(1);
       Ok((best_img.clone(), input.player_idx == self.players.len() as u8 - 1))
     }
 

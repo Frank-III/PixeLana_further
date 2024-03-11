@@ -103,7 +103,7 @@ export default function EndRoom() {
                     </div>
                     <button
                       className="items-center justify-center disabled:opacity-50"
-                      onClick={() => likeDraw(playerIdx.toString(), c.idx.toString())}
+                      onClick={() => likeDraw(playerIdx, c.idx)}
                       disabled={playerIdx !== roundRec}
                     >
                       <svg
