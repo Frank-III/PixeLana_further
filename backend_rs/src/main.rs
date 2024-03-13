@@ -39,6 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Ok(players) = game.add_player(player, socket.id.as_str().to_string()) {
                 socket.emit("updatePlayers", vec![&players]).ok();
                 socket.broadcast().emit("updatePlayers", vec![&players]).ok();
+                // utils::broadcast_all(socket, vec![&players]);
                 // socket.emit("updateLeaderBoard", game.get_leaderboard()).ok();
                 // io_clone.emit("updatePlayers", players).ok(); // Emit to all clients
                 // io_clone.emit("updateLeaderBoard", game.get_leaderboard()).ok(); // Emit to all clients
