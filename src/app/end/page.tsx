@@ -33,7 +33,7 @@ export default function EndRoom() {
   const { socket, socketId } = useSocketAuth();
   const resultRef = useRef<HTMLDivElement>(null);
   const [roundRec, setRoundRec] = useState(0);
-  const { isHost, players, playerIdx } = useGameState();
+  const { roomId, isHost, players, playerIdx } = useGameState();
   const { likeDraw, backRoom } = useAction(isHost);
 
   const [content, setContent] = useState<Content[]>();
@@ -42,7 +42,7 @@ export default function EndRoom() {
 
   useEffect(() => {
     if (socket) {
-      socket.emit("getAllImgsOrPrompts", roundRec);
+      socket.emit("getAllImgsOrPrompts", [roomId, roundRec]);
 
       socket.on('allImgsOrPrompts', ({content, round}) => {
         const contents = content.map((c: any) => ({
@@ -55,7 +55,7 @@ export default function EndRoom() {
       socket.on("roundImgLiked", (round) => {
         setRoundRec(round)
         if (round < players.length) {
-          socket.emit("getAllImgsOrPrompts", round)
+          socket.emit("getAllImgsOrPrompts", [roomId, round])
         }
       });
 

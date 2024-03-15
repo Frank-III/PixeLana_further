@@ -40,6 +40,15 @@ struct RoomLikeImgInput {
     pub like: LikeDrawInput 
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct GetRoundInfoInput{
+    #[serde(rename = "roomId")]
+    pub room_id: String,
+    #[serde(rename = "playerIdx")]
+    pub player_idx: usize
+}
+
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -97,8 +106,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     socket.emit("promptStart", ()).ok();
                     return
                 }
-                warn!("Could not start game {:?}", room_id);
             }
+            warn!("Could not start game {:?}", room_id);
         });
 
         s.on("submitPrompt", |socket: SocketRef, Data::<SubmitRoomInput>(SubmitRoomInput {room_id, submission}), State(Games(games))| {
@@ -111,12 +120,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     socket.emit("promptFinished", ()).ok();
                     return
                 }
-                warn!("Could not submit prompt for game {:?}", room_id);
             }
             warn!("Room Id not Found")
         });
 
-        s.on("getRoundInfo", |s: SocketRef, Data::<(String,usize)>((room_id, player_idx)), State(Games(games))| {
+        s.on("getRoundInfo", |s: SocketRef, Data::<GetRoundInfoInput>(GetRoundInfoInput {room_id, player_idx}), State(Games(games))| {
             info!("Received Game {:?} getRoundInfo event: {:?}", room_id, player_idx);
             let games = games.read().unwrap();
             if let Some(game) = games.get(&room_id) {
@@ -133,6 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(game) = games.get(&room_id) {
                 let mut game = game.lock().unwrap();
                 if let Ok(true) = game.submit_img_or_prompt(submission) {
+                    info!("Game {:?} round finished", room_id);
                     if game.game_finished() {
                         socket.to(room_id).emit("gameFinished", ()).ok();
                         socket.emit("gameFinished", ()).ok();
@@ -166,13 +175,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match game.like_img(like) {
                     Ok((best_img, like_end)) => {
                         socket.emit("bestImage", &best_img).ok();
-                        socket.broadcast().emit("bestImage", best_img).ok();
+                        socket.to(room_id.clone()).emit("bestImage", best_img).ok();
                         if !like_end {
                             socket.emit("roundImgLiked", round + 1).ok();
-                            socket.broadcast().emit("roundImgLiked", round + 1).ok();
+                            socket.to(room_id.clone()).emit("roundImgLiked", round + 1).ok();
                             let leader_board = game.get_leaderboard();
                             socket.emit("updateLeaderBoard", &leader_board).ok();
-                            socket.broadcast().emit("updateLeaderBoard", &leader_board).ok();
+                            socket.to(room_id).emit("updateLeaderBoard", &leader_board).ok();
                         }
                     },
                     Err(e) => {
@@ -185,13 +194,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
         s.on("backRoom", |socket: SocketRef, Data::<String>(room_id), State(Games(games))| {
-            info!("Received backRoom event");
+            info!("Received backRoom event: {:?}", room_id);
             let games = games.read().unwrap();
             if let Some(game) = games.get(&room_id) {
                 let mut game = game.lock().unwrap();
                 if let Ok(_) = game.reset_game() {
-                    socket.emit("backRoom", ()).ok();
-                    socket.broadcast().emit("backRoom", ()).ok();
+                    socket.emit("goBackLobby", ()).ok();
+                    socket.to(room_id).emit("goBackLobby", ()).ok();
                     return
                 }
             }

@@ -48,7 +48,7 @@ export const useAction = (host= false) => {
   const submitRoundInfo = useCallback(
     (playerIdx: number, info: string) => {
       if (socket) {
-        socket.emit("submitRoundInfo", {playerIdx: playerIdx, content: info});
+        socket.emit("submitRoundInfo", {roomId: roomId, submission:{playerIdx: playerIdx, content: info}});
       }
     },
     [socket],

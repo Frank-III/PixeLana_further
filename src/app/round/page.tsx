@@ -37,7 +37,7 @@ export default function Game() {
   const router = useRouter()
   const {socket} = useSocketAuth();
   const {submitRoundInfo} = useAction();
-  const {playerIdx} = useGameState();
+  const {roomId, playerIdx} = useGameState();
   // if image Round (for a certain user)
   const [isImage, setIsImage] = useState(false);
   // received content, either image or story
@@ -105,7 +105,7 @@ export default function Game() {
 
   useEffect(() => { 
     if(socket) {
-      socket.emit('getRoundInfo', playerIdx)
+      socket.emit('getRoundInfo', {roomId: roomId, playerIdx: playerIdx})
 
       socket.on('roundInfo', (content: {type: "image" | "prompt", data: string}) => {
         setSubmitted(false);
@@ -115,7 +115,7 @@ export default function Game() {
       })
 
       socket.on('roundFinished', (data) => {
-        socket.emit('getRoundInfo', playerIdx);
+        socket.emit('getRoundInfo', {roomId: roomId, playerIdx: playerIdx});
       })
 
       socket.on('gameFinished', () => {
