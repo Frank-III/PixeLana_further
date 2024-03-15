@@ -18,9 +18,10 @@ pub struct Player {
     pub avatar: String,
 }
 
+
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PlayerInput {
+pub struct AddPlayerInput {
     #[serde(rename = "pubKey")]
     pub pub_key: String,
     pub name: String,
@@ -31,7 +32,7 @@ pub struct PlayerInput {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Submission {
-    #[serde(rename = "playerIdx")]
+  #[serde(rename = "playerIdx")]
   pub player_idx: u8,
   pub content: String
 }
@@ -119,7 +120,7 @@ impl GameState {
         Ok(())
     }
 
-    pub fn add_player(&mut self, player: PlayerInput, socket_id: String) -> Result<Vec<Player>> {
+    pub fn add_player(&mut self, player: AddPlayerInput, socket_id: String) -> Result<Vec<Player>> {
         if self.game_started {
             bail!(GameError::GameStarted)
         }

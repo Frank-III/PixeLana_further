@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 interface GameState {
+  roomId: string;
   players: Array<User>;
   isHost: boolean;
   playerIdx: number;
@@ -27,16 +28,22 @@ interface GameState {
   leaderBoard: Array<[string, string]>;
 }
 
-const defaultGameState: GameState = {
+interface GameStateContext extends GameState {
+  setGameId: (gameId: string) => void;
+}
+
+const defaultGameState: GameStateContext = {
+  roomId: "",
   players: [],
   isHost: false,
   playerIdx: -1,
   round: 0,
   gameState: "none",
   leaderBoard: [],
+  setGameId: () => {}
 };
 
-const GameStateContext = createContext<GameState>(defaultGameState);
+const GameStateContext = createContext<GameStateContext>(defaultGameState);
 
 export const useGameState = () => useContext(GameStateContext);
 
@@ -63,6 +70,17 @@ export const GameStateProvider: FC<{ children: ReactNode }> = ({
           gameState: "waitingForPlayers",
         }));
       })
+
+      socket.on("roomCreated", ((players, roomId) => {
+        setGameState((prev) => ({
+          ...prev,
+          players,
+          roomId,
+          isHost: true,
+          playerIdx: 0,
+          gameState: "waitingForPlayers",
+        }));
+      }))
 
       socket.on("updatePlayers", (players: Array<User>) => {
         setGameState((prev) => ({
@@ -126,8 +144,11 @@ export const GameStateProvider: FC<{ children: ReactNode }> = ({
     }
   }, [socket]);
 
+  const setGameId = (gameId: string) => {
+    setGameState((prev) => ({ ...prev, roomId: gameId }));
+  };
   return (
-    <GameStateContext.Provider value={gameState}>
+    <GameStateContext.Provider value={{...gameState, setGameId } }>
       {children}
     </GameStateContext.Provider>
   );

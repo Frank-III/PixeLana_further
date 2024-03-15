@@ -1,5 +1,6 @@
 import { Avatar, AvatarImage } from "@radix-ui/react-avatar";
 import { Button } from "./ui/button";
+import { useGameState } from "@/contexts/GameStateProvider";
 
 
 export interface User {
@@ -27,11 +28,13 @@ export function UserCard({ user }: { user: User }) {
 
 
 export function Room({ users }: RoomProps) {
-  console.log(users)
-  
+  // console.log(users)
+  const {roomId} = useGameState();
+
   return (
     <div className="flex flex-col items-center justify-center w-full">
       <h1 className="font-customs text-[50px] text-shadow-custom text-[#8DFCBC]">Room</h1>
+      <h2 className="text-shadow sm:text-shadow-sm md:text-shadow-md lg:text-shadow-lg xl:text-shadow-xl">ROOM ID: {roomId}</h2>
       <h2 className="text-shadow sm:text-shadow-sm md:text-shadow-md lg:text-shadow-lg xl:text-shadow-xl">PLAYERS: {users.length}/7 </h2>
       <div className="flex flex-row border-[5px] w-full border-black rounded-lg overflow-x-auto">
         {users.map((user) => (

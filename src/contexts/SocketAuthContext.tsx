@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 
 interface SocketAuthContextState {
   socket: Socket | null;
-  connectSocket: ({name, avatar, pubKey}: {name: string; avatar:string; pubKey: string}) => void;
+  connectSocket: ({name, avatar, pubKey, roomId}: {name: string; avatar:string; pubKey: string, roomId?:string}) => void;
   disconnectSocket: () => void;
   socketId: string;
 }
@@ -28,7 +28,7 @@ export const SocketAuthProvider: FC<{ children: ReactNode }> = ({ children }) =>
   const [socketId, setSocketId] = useState<string>('');
   const wallet = useWallet();
 
-  const connectSocket = useCallback(({name, avatar, pubKey}:{name: string, avatar:string, pubKey: string}) => {
+  const connectSocket = useCallback(({name, avatar, pubKey, roomId}:{name: string, avatar:string, pubKey: string, roomId?: string}) => {
     if (!wallet.connected || !wallet.publicKey) {
       toast.error('Please connect your wallet first');
       return;
@@ -41,7 +41,11 @@ export const SocketAuthProvider: FC<{ children: ReactNode }> = ({ children }) =>
     newSocket.on('connect', () => {
       console.log('Connected to Socket.IO server', newSocket.id);
       setSocketId(newSocket.id!);
-      newSocket.emit('addPlayer', {name:name, avatar:avatar, pubKey:pubKey});
+      if (roomId) {
+        newSocket.emit('joinRoom', {roomId:roomId, player:{name:name, avatar:avatar, pubKey:pubKey}});
+      } else {
+        newSocket.emit('newRoom', {name:name, avatar:avatar, pubKey:pubKey});
+      }
     });
 
     newSocket.on('connect_error', (error) => {

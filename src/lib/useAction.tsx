@@ -7,7 +7,7 @@ import { useCallback } from "react";
 //TODO: add a parameter: isHost to make sure he could access the host actions
 export const useAction = (host= false) => {
   const { socket, disconnectSocket } = useSocketAuth();
-  const { isHost, gameState } = useGameState();
+  const { isHost, gameState, roomId } = useGameState();
 
   // equal leaveGame ?
   const reset = useCallback(() => {
@@ -25,7 +25,7 @@ export const useAction = (host= false) => {
   const startGame = useCallback(() => {
     if (socket) {
       console.log(isHost,gameState) 
-      socket.emit("startGame");
+      socket.emit("startGame", roomId);
     }
   }, [socket]);
 
@@ -39,7 +39,7 @@ export const useAction = (host= false) => {
     (playerIdx: number, prompt: string) => {
       console.log("submitPrompt", playerIdx, prompt)
       if (socket) {
-        socket.emit("submitPrompt", {playerIdx:playerIdx, content:prompt});
+        socket.emit("submitPrompt", {roomId: roomId, submission:{playerIdx:playerIdx, content:prompt}});
       }
     },
     [socket],
@@ -57,7 +57,7 @@ export const useAction = (host= false) => {
   const likeDraw = useCallback(
     (playerIdx: number, likeIdx: number) => {
       if (socket) {
-        socket.emit("likeDrawing", {playerIdx:playerIdx, likeIdx:likeIdx});
+        socket.emit("likeDrawing", {roomId: roomId, like:{playerIdx:playerIdx, likeIdx:likeIdx}});
       }
     },
     [socket],
@@ -65,7 +65,7 @@ export const useAction = (host= false) => {
 
   const backRoom = useCallback(() => {
     if (socket) {
-      socket.emit("backRoom");
+      socket.emit("backRoom", roomId);
     }
   }, [socket]);
 

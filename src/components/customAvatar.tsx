@@ -7,6 +7,16 @@ import { useSocketAuth } from "@/contexts/SocketAuthContext";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "./ui/input";
+import { useGameState } from "@/contexts/GameStateProvider";
 
 const avatars = [
   "life-in-the-balance.png",
@@ -55,9 +65,37 @@ const genRandomName = () => {
   return randomName;
 };
 
+
+function JoinRoomDialog({onClick}: { onClick: (roomId: string) => void}) {
+  const [roomId, setRoomId] = useState("");
+  return (
+    <Dialog >
+      <DialogTrigger asChild>
+      <Button
+        className="ring-offset-3 flex h-[80px] w-[200px] items-center justify-center rounded-xl text-[32px] italic ring-8 ring-orange-600 ring-offset-black transition ease-in-out hover:-translate-y-1 hover:scale-110 hover:bg-[#f7d726]"
+      >
+        Join!
+      </Button>
+      </DialogTrigger>
+      <DialogContent className="bg-secondary justify-center flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="font-sans text-white">
+            Enter The Room Id to Join 
+          </DialogTitle>
+        </DialogHeader>
+        <Input value={roomId} onInput={(e) => {setRoomId(e.currentTarget.value)}}/>
+        <Button className="rounded-xl italic ring-[5px] ring-orange-600 hover:bg-[#f7d726] text-shadow-md" onClick={() => onClick(roomId)}>
+          Submit
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AvatarPicker() {
   const router = useRouter();
   const { connectSocket } = useSocketAuth();
+  const {setGameId} = useGameState();
   const wallet = useWallet();
   const leftPath =
     "M168 48v160a8 8 0 0 1-13.66 5.66l-80-80a8 8 0 0 1 0-11.32l80-80A8 8 0 0 1 168 48";
@@ -153,30 +191,18 @@ export function AvatarPicker() {
           </svg>
         </div>
       </div>
+      <div className="items-center justify-center flex flex-row gap-10">
       <Button
-        className="ring-offset-3 flex h-[100px] w-[500px] items-center justify-center rounded-xl text-[64px] italic ring-8 ring-orange-600 ring-offset-black transition ease-in-out hover:-translate-y-1 hover:scale-110 hover:bg-[#f7d726]"
+        className="ring-offset-3 flex h-[80px] w-[200px] items-center justify-center rounded-xl text-[32px] italic ring-8 ring-orange-600 ring-offset-black transition ease-in-out hover:-translate-y-1 hover:scale-110 hover:bg-[#f7d726]"
         onClick={() => connectSocket({name:name, avatar:`/avatars/${avatars[chosenIndex]}`, pubKey: wallet.publicKey?.toBase58()!})}
       >
-        <div className="mr-1 overflow-hidden rounded-full">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 512 512"
-            height="50"
-            width="50"
-          >
-            <path d="M0 0h512v512H0z" fill="#F9E05A" fill-opacity="1" />
-            <g className="" transform="translate(0,0)">
-              <path
-                d="M123.193 29.635L121 406.18l84.31-82.836 65.87 159.02 67.5-27.96-65.87-159.02L391 294.342z"
-                fill="#000000"
-                fill-opacity="1"
-              />
-            </g>
-          </svg>
-        </div>
-        Start!
+        New Game!
       </Button>
+      <JoinRoomDialog onClick={(roomId) => {
+        setGameId(roomId);
+        connectSocket({name:name, avatar:`/avatars/${avatars[chosenIndex]}`, pubKey: wallet.publicKey?.toBase58()!, roomId})}} />
+      </div>
     </div>
-</div>
+  </div>
   );
 }

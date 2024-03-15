@@ -1,21 +1,44 @@
-use serde::{Deserialize, Serialize};
 use socketioxide::{
-    extract::{Data, SocketRef, State}, socket::Socket, SocketIo
+    extract::{Data, SocketRef, State}, SocketIo
 };
 mod utils;
 mod state;
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, sync::RwLock};
 use anyhow::{bail, Result};
 use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, services::ServeDir};
-use axum::routing::get;
-use serde_json::Value;
+use tower_http::{cors::CorsLayer};
 use tracing_subscriber::FmtSubscriber;
 use std::sync::Mutex;
-use std::sync::Arc;
-use tracing::info;
-use state::{GameState, Player, Content, Submission, LikeDrawInput, PlayerInput};
-struct Game(pub Mutex<GameState>);
+use tracing::{info, warn};
+use state::{GameState, Submission, LikeDrawInput, };
+
+use crate::state::AddPlayerInput;
+
+// struct Game(pub Mutex<GameState>);
+#[derive(Default)]
+struct Games(pub RwLock<HashMap<String, Mutex<GameState>>>);
+
+#[derive(Debug, serde::Deserialize)]
+struct SubmitRoomInput {
+    #[serde(rename = "roomId")]
+    pub room_id: String,
+    pub submission: Submission
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct JoinRoomInput {
+    #[serde(rename = "roomId")]
+    pub room_id: String,
+    pub player: AddPlayerInput
+}
+
+
+#[derive(Debug, serde::Deserialize)]
+struct RoomLikeImgInput {
+    #[serde(rename = "roomId")]
+    pub room_id: String,
+    pub like: LikeDrawInput 
+}
 
 
 #[tokio::main]
@@ -28,101 +51,151 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Or I could make the Game => Mutex<Option<GameState>> 
     let (layer, io) = SocketIo::builder()
-        .with_state(Game(Mutex::new(GameState::default())))
+        .with_state(Games::default())
         .build_layer();
 
     io.ns("/", |s: SocketRef | {
         info!("New connection: {}", s.id);
-        s.on("addPlayer", |socket: SocketRef, Data::<PlayerInput>(player), State(Game(game))| {
-            info!("Received addPlayer event: {:?}", player);
-            let mut game = game.lock().unwrap();    
-            if let Ok(players) = game.add_player(player, socket.id.as_str().to_string()) {
-                socket.emit("updatePlayers", vec![&players]).ok();
-                socket.broadcast().emit("updatePlayers", vec![&players]).ok();
-                // utils::broadcast_all(socket, vec![&players]);
-                // socket.emit("updateLeaderBoard", game.get_leaderboard()).ok();
-                // io_clone.emit("updatePlayers", players).ok(); // Emit to all clients
-                // io_clone.emit("updateLeaderBoard", game.get_leaderboard()).ok(); // Emit to all clients
+        
+        // add listen to event: newRoom
+        s.on("newRoom", |socket: SocketRef, Data::<AddPlayerInput>(player), State(Games(games))| {
+            info!("Received newRoom event");
+            let mut games = games.write().unwrap();
+            let room_id = utils::generate_room_id();
+            let mut new_game = GameState::new();
+            socket.join(room_id.clone()).ok();
+            info!("New Room ID: {}", room_id);  
+            if let Ok(players) = new_game.add_player(player, socket.id.as_str().to_string()) {
+                games.insert(room_id.clone(), Mutex::new(new_game));
+                // TODO: send out roomId as well
+                socket.emit("roomCreated", (&players, room_id)).ok();
             }
         });
 
-        s.on("startGame", |socket: SocketRef, State(Game(game))| {
+        s.on("joinRoom", |socket: SocketRef, Data::<JoinRoomInput>(JoinRoomInput {room_id, player}), State(Games(games))| {
             info!("Received startGame event");
-            let mut game = game.lock().unwrap();
-            if let Ok(_) = game.start_game() {
-                socket.emit("promptStart", ()).ok();
-                socket.broadcast().emit("promptStart", ()).ok();
+            let games = games.read().unwrap();
+            if let Some(game) = games.get(&room_id) {
+                let mut game = game.lock().unwrap();
+                if let Ok(players) = game.add_player(player, socket.id.as_str().to_string()) {
+                    socket.join(room_id.clone()).ok();
+                    socket.to(room_id.clone()).emit("updatePlayers", vec![&players]).ok();
+                    socket.emit("updatePlayers", vec![&players]).ok();
+                    return 
+                }
+            }
+            warn!("Room Id not Found")
+        });
+
+        s.on("startGame", |socket: SocketRef, Data::<String>(room_id), State(Games(games))| {
+            info!("Received startGame event");
+            let games = games.read().unwrap();
+            if let Some(game) = games.get(&room_id) {
+                let mut game = game.lock().unwrap();
+                if let Ok(_) = game.start_game() {
+                    socket.to(room_id).emit("promptStart", ()).ok();
+                    socket.emit("promptStart", ()).ok();
+                    return
+                }
+                warn!("Could not start game {:?}", room_id);
             }
         });
 
-        s.on("submitPrompt", |socket: SocketRef, Data::<Submission>(submission), State(Game(game))| {
-            info!("Received submitPrompt event: {:?}", submission);
-            let mut game = game.lock().unwrap();
-            if let Ok(true) = game.submit_img_or_prompt(submission) {
-                socket.emit("promptFinished", ()).ok();
-                socket.broadcast().emit("promptFinished", ()).ok();
+        s.on("submitPrompt", |socket: SocketRef, Data::<SubmitRoomInput>(SubmitRoomInput {room_id, submission}), State(Games(games))| {
+            info!("Received Game {:?} submitPrompt event: {:?}", room_id, submission);
+            let games = games.read().unwrap();
+            if let Some(game) = games.get(&room_id) {
+                let mut game = game.lock().unwrap();
+                if let Ok(true) = game.submit_img_or_prompt(submission) {
+                    socket.to(room_id).emit("promptFinished", ()).ok();
+                    socket.emit("promptFinished", ()).ok();
+                    return
+                }
+                warn!("Could not submit prompt for game {:?}", room_id);
             }
+            warn!("Room Id not Found")
         });
 
-        s.on("getRoundInfo", |s: SocketRef, Data::<usize>(player_idx), State(Game(game))| {
-            info!("Received getRoundInfo event: {:?}", player_idx);
-            let game = game.lock().unwrap();
-            if let Ok(content) = game.send_round_info(player_idx as u8) {
-                s.emit("roundInfo", content).ok();
-            }
-        });
-
-        s.on("submitRoundInfo", |socket: SocketRef, Data::<Submission>(submission), State(Game(game))| {
-            info!("Received submitRoundInfo event: {:?}", submission);
-            let mut game = game.lock().unwrap();
-            if let Ok(true) = game.submit_img_or_prompt(submission) {
-                if game.game_finished() {
-                    socket.emit("gameFinished", ()).ok();
-                    socket.broadcast().emit("gameFinished", ()).ok();
-                } else {
-                    socket.emit("roundFinished", ()).ok();
-                    socket.broadcast().emit("roundFinished", ()).ok();
+        s.on("getRoundInfo", |s: SocketRef, Data::<(String,usize)>((room_id, player_idx)), State(Games(games))| {
+            info!("Received Game {:?} getRoundInfo event: {:?}", room_id, player_idx);
+            let games = games.read().unwrap();
+            if let Some(game) = games.get(&room_id) {
+                let game = game.lock().unwrap();
+                if let Ok(content) = game.send_round_info(player_idx as u8) {
+                    s.emit("roundInfo", content).ok();
                 }
             }
         });
 
-        s.on("getAllImgsOrPrompts", |s: SocketRef, Data::<usize>(round), State(Game(game))| {
-            info!("Received getAllImgsOrPrompts event: {:?}", round);
-            let game = game.lock().unwrap();
-            if let Ok(all_imgs_prompts) = game.get_all_imgs_or_prompts(round as u8) {
-                s.emit("allImgsOrPrompts", all_imgs_prompts).ok();
-            }
-        });
-
-        s.on("likeDrawing", |socket: SocketRef, Data::<LikeDrawInput>(input), State(Game(game))| {
-            info!("Received likeDrawing event: {:?}", input);
-            let mut game = game.lock().unwrap();
-            let round = input.player_idx;
-            match game.like_img(input) {
-                Ok((best_img, like_end)) => {
-                    socket.emit("bestImage", &best_img).ok();
-                    socket.broadcast().emit("bestImage", best_img).ok();
-                    if !like_end {
-                        socket.emit("roundImgLiked", round + 1).ok();
-                        socket.broadcast().emit("roundImgLiked", round + 1).ok();
-                        let leader_board = game.get_leaderboard();
-                        socket.emit("updateLeaderBoard", &leader_board).ok();
-                        socket.broadcast().emit("updateLeaderBoard", &leader_board).ok();
+        s.on("submitRoundInfo", |socket: SocketRef, Data::<SubmitRoomInput>(SubmitRoomInput {room_id, submission}), State(Games(games))| {
+            info!("Received Game {:?} submitRoundInfo event: {:?}", room_id, submission);
+            let games = games.read().unwrap();
+            if let Some(game) = games.get(&room_id) {
+                let mut game = game.lock().unwrap();
+                if let Ok(true) = game.submit_img_or_prompt(submission) {
+                    if game.game_finished() {
+                        socket.to(room_id).emit("gameFinished", ()).ok();
+                        socket.emit("gameFinished", ()).ok();
+                    } else {
+                        socket.to(room_id).emit("roundFinished", ()).ok();
+                        socket.emit("roundFinished", ()).ok();
                     }
-                },
-                Err(e) => {
-                    info!("Error: {:?}", e);
-                }   
+                }
+                return
+            }
+            warn!("Room Id not Found")
+        });
+
+        s.on("getAllImgsOrPrompts", |socket: SocketRef, Data::<(String, usize)>((room_id, round)), State(Games(games))| {
+            info!("Received getAllImgsOrPrompts event: {:?}", round);
+            let games = games.read().unwrap();
+            if let Some(game) = games.get(&room_id) {
+                let game = game.lock().unwrap();
+                if let Ok(all_imgs_prompts) = game.get_all_imgs_or_prompts(round as u8) {
+                    socket.emit("allImgsOrPrompts", all_imgs_prompts).ok();
+                }
             }
         });
 
-        s.on("backRoom", |socket: SocketRef, State(Game(game))| {
-            info!("Received backRoom event");
-            let mut game = game.lock().unwrap();
-            if let Ok(_) = game.reset_game() {
-                socket.emit("backRoom", ()).ok();
-                socket.broadcast().emit("backRoom", ()).ok();
+        s.on("likeDrawing", |socket: SocketRef, Data::<RoomLikeImgInput>(RoomLikeImgInput {room_id, like}), State(Games(games))| {
+            info!("Received Game {:?} likeDrawing event: {:?}", room_id, like);
+            let games = games.read().unwrap();
+            if let Some(game) = games.get(&room_id) {
+                let mut game = game.lock().unwrap();
+                let round = like.player_idx;
+                match game.like_img(like) {
+                    Ok((best_img, like_end)) => {
+                        socket.emit("bestImage", &best_img).ok();
+                        socket.broadcast().emit("bestImage", best_img).ok();
+                        if !like_end {
+                            socket.emit("roundImgLiked", round + 1).ok();
+                            socket.broadcast().emit("roundImgLiked", round + 1).ok();
+                            let leader_board = game.get_leaderboard();
+                            socket.emit("updateLeaderBoard", &leader_board).ok();
+                            socket.broadcast().emit("updateLeaderBoard", &leader_board).ok();
+                        }
+                    },
+                    Err(e) => {
+                        warn!("Error: {:?}", e);
+                    }   
+                }
+                return
             }
+            warn!("Room Id not Found")
+        });
+
+        s.on("backRoom", |socket: SocketRef, Data::<String>(room_id), State(Games(games))| {
+            info!("Received backRoom event");
+            let games = games.read().unwrap();
+            if let Some(game) = games.get(&room_id) {
+                let mut game = game.lock().unwrap();
+                if let Ok(_) = game.reset_game() {
+                    socket.emit("backRoom", ()).ok();
+                    socket.broadcast().emit("backRoom", ()).ok();
+                    return
+                }
+            }
+            warn!("Room Id not Found")
         });
 
     });
