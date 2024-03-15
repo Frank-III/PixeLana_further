@@ -4,23 +4,34 @@ PixeLana is a multiplayer web app game where Stable Diffusion meets the Solana B
 Winners will have their art minted in memory and as an NFT on the Solana Blockchain with fast confirmation times and low transaction fees.
 
 ## What's Next?
-PixeLana was originally a project submission to [HackIllinois 2024](https://hackillinois-2024.devpost.com/) (where PixeLana was awarded a [1st place finish](https://hackillinois-2024.devpost.com/project-gallery)) and will be revamped for [Renaissance](https://www.colosseum.org/renaissance), a global online hackathon hosted by the Solana Foundation!
+
+This is Frank's(main dev of PixeLana) personal fork of PixeLana that would be focusing on multi-room and more gartic-phone like game instead of going fully on chain, it is designed to be highly performant(backend rewritten in Rust), and would offer better UX once everything works!
+
+## TODO
+
+- replace hashmap with mongodb for scalability
+- better handling user disconnect
+- UX improvement
+- draw ai integration
+- transition
+- host 
+- ...
+
 
 ## Try it Out!
 We are working fast to deploy our application! For eager players that would like to try the game **on the same network**:
 
 1. Open a terminal
 ```
-cd diffusion-phone
+cd PixeLana_further
 npm i
 npm run dev
 ```
 
 2. Open another terminal
 ```
-cd diffusion-phone/server
-npm i
-npm run dev
+cd PixeLana_further/backend_rs
+cargo run
 ```
 
 3. Have each player create a Wallet from any of the following providers: 

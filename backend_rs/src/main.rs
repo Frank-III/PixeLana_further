@@ -209,6 +209,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     });
 
+    // logic to handle disconnects
+
     let app = axum::Router::new()
         .with_state(io)
         .layer(
